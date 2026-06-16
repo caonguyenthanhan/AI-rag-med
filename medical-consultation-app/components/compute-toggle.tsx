@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 export default function ComputeToggle() {
   const [mode, setMode] = useState<'cpu'|'gpu'>('cpu')
@@ -8,6 +9,7 @@ export default function ComputeToggle() {
   const [summary, setSummary] = useState<{cpu?: number, gpu?: number}>({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string>('')
+  const runtimeStateUrl = buildPublicBackendUrl('/v1/runtime/state')
 
   const load = async () => {
     try {
@@ -15,8 +17,7 @@ export default function ComputeToggle() {
       if (typeof window !== 'undefined') auth = localStorage.getItem('authToken')
       let m: any = null
       try {
-        const url = 'http://127.0.0.1:8000/v1/runtime/state'
-        const resp = await fetch(url, { headers: auth ? { 'Authorization': `Bearer ${auth}` } : undefined })
+        const resp = await fetch(runtimeStateUrl, { headers: auth ? { 'Authorization': `Bearer ${auth}` } : undefined })
         if (resp.ok) m = await resp.json()
       } catch {}
       if (!m) m = await fetch('/api/runtime/mode').then(r => r.json())
@@ -68,14 +69,14 @@ export default function ComputeToggle() {
         setGpuUrl(url)
         try {
           const auth = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-          await fetch('http://127.0.0.1:8000/v1/runtime/state', { method: 'POST', headers: auth ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth}` } : { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'gpu', gpu_url: url }) })
+          await fetch(runtimeStateUrl, { method: 'POST', headers: auth ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth}` } : { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'gpu', gpu_url: url }) })
         } catch {}
       } else {
         await fetch('/api/runtime/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'cpu' }) })
         setMode('cpu')
         try {
           const auth = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
-          await fetch('http://127.0.0.1:8000/v1/runtime/state', { method: 'POST', headers: auth ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth}` } : { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'cpu' }) })
+          await fetch(runtimeStateUrl, { method: 'POST', headers: auth ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${auth}` } : { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'cpu' }) })
         } catch {}
       }
       await load()

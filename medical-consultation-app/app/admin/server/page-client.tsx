@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react"
 import Link from "next/link"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 type ServerItem = {
   id: string
@@ -12,9 +13,10 @@ type ServerItem = {
 }
 
 export default function AdminServerPage() {
+  const conversationsUrl = buildPublicBackendUrl("/v1/conversations")
   const [servers, setServers] = useState<ServerItem[]>([])
   const [logs, setLogs] = useState<any[]>([])
-  const [form, setForm] = useState({ url: "https://elissa-villous-scourgingly.ngrok-free.dev" })
+  const [form, setForm] = useState({ url: process.env.NEXT_PUBLIC_DEFAULT_GPU_URL || "" })
   const [checkingId, setCheckingId] = useState<string | null>(null)
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [events, setEvents] = useState<any[]>([])
@@ -99,10 +101,10 @@ export default function AdminServerPage() {
     try {
       const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null
       if (token) {
-        const list = await fetch('http://127.0.0.1:8000/v1/conversations', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+        const list = await fetch(conversationsUrl, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
         const ids = (list?.conversations || []).map((c: any) => c.id)
         for (const id of ids) {
-          await fetch(`http://127.0.0.1:8000/v1/conversations/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
+          await fetch(`${conversationsUrl}/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } })
         }
       }
       if (typeof window !== 'undefined') {

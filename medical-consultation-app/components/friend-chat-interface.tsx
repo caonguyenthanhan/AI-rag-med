@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent } from "@/components/ui/card"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 const GREETINGS: string[] = [
   "Ở đây rồi, cứ nói những gì bạn muốn. Tôi nghe.",
@@ -23,6 +24,9 @@ interface Message {
 }
 
 export function FriendChatInterface({ initialConversationId }: { initialConversationId?: string }) {
+  const friendChatUrl = buildPublicBackendUrl("/v1/friend-chat/completions")
+  const sttStreamUrl = buildPublicBackendUrl("/v1/stt/stream")
+  const ttsStreamUrl = buildPublicBackendUrl("/v1/tts/stream")
   const [greeting, setGreeting] = useState(GREETINGS[0])
   useEffect(() => {
     const randomGreeting = GREETINGS[Math.floor(Math.random() * GREETINGS.length)]
@@ -326,7 +330,7 @@ export function FriendChatInterface({ initialConversationId }: { initialConversa
         conversationHistory,
         messages: conversationHistory,
       }
-      const url = authToken ? "http://127.0.0.1:8000/v1/friend-chat/completions" : "/api/tam-su-chat"
+      const url = authToken ? friendChatUrl : "/api/tam-su-chat"
       const headers: Record<string, string> = { "Content-Type": "application/json" }
       if (authToken) headers["Authorization"] = `Bearer ${authToken}`
       const response = await fetch(url, { method: "POST", headers, body: JSON.stringify(payload) })
@@ -450,7 +454,7 @@ export function FriendChatInterface({ initialConversationId }: { initialConversa
           formData.append("file", blob, "voice.webm")
           let sttUrl = ""
           if (authToken) {
-            sttUrl = "http://127.0.0.1:8000/v1/stt/stream"
+            sttUrl = sttStreamUrl
           } else {
             const r = await fetch("/api/servers/latest")
             const j = await r.json()
@@ -481,7 +485,7 @@ export function FriendChatInterface({ initialConversationId }: { initialConversa
             let ttsUrl = ""
             const reqBody = { text: finalText, lang: "vi" }
             if (authToken) {
-              ttsUrl = "http://127.0.0.1:8000/v1/tts/stream"
+              ttsUrl = ttsStreamUrl
             } else {
               const r2 = await fetch("/api/servers/latest")
               const j2 = await r2.json()

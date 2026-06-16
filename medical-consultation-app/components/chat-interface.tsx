@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 interface Message {
   id: string
@@ -24,6 +25,13 @@ interface Message {
 export function ChatInterface({ initialConversationId }: { initialConversationId?: string }) {
   const router = useRouter()
   const { toast } = useToast()
+  const conversationsStartUrl = buildPublicBackendUrl('/v1/conversations/start')
+  const conversationsNewUrl = buildPublicBackendUrl('/v1/conversations/new')
+  const chatCompletionsUrl = buildPublicBackendUrl('/v1/chat/completions')
+  const visionChatUrl = buildPublicBackendUrl('/v1/vision-chat')
+  const documentChatUrl = buildPublicBackendUrl('/v1/document-chat')
+  const runtimeStateUrl = buildPublicBackendUrl('/v1/runtime/state')
+  const conversationsUrl = buildPublicBackendUrl('/v1/conversations')
   const initRef = useRef<{ fetched: boolean; opened: boolean; navigating: boolean }>({ fetched: false, opened: false, navigating: false })
   const [headerPad, setHeaderPad] = useState<string>('6rem')
   useEffect(() => {
@@ -172,7 +180,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       }
     }
     try {
-      const resp = await fetch('http://127.0.0.1:8000/v1/conversations/start', {
+      const resp = await fetch(conversationsStartUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ title: '' })
@@ -226,7 +234,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
         messages: conversationHistory
       }
 
-      const response = await fetch(authToken ? 'http://127.0.0.1:8000/v1/chat/completions' : '/api/llm-chat', {
+      const response = await fetch(authToken ? chatCompletionsUrl : '/api/llm-chat', {
         method: 'POST',
         headers: authToken ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` } : { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -345,7 +353,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
         }
         setMessages((prev) => [...prev, userMessage])
 
-        const resp = await fetch('http://127.0.0.1:8000/v1/vision-chat', {
+        const resp = await fetch(visionChatUrl, {
           method: 'POST',
           headers: authToken ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` } : { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: currentInput, image_base64: selectedImageBase64 })
@@ -380,7 +388,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
         }
         setMessages((prev) => [...prev, userMessage])
 
-        const resp = await fetch('http://127.0.0.1:8000/v1/document-chat', {
+        const resp = await fetch(documentChatUrl, {
           method: 'POST',
           headers: authToken ? { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` } : { 'Content-Type': 'application/json' },
           body: JSON.stringify({ text: currentInput, doc_base64: selectedDocContent, doc_name: selectedDocName })
@@ -516,7 +524,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
   const beginNewConversation = async () => {
     if (authToken) {
       try {
-        const resp = await fetch('http://127.0.0.1:8000/v1/conversations/new', {
+        const resp = await fetch(conversationsNewUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
           body: JSON.stringify({ title: '' })
@@ -707,7 +715,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
     ;(async () => {
       try {
         const headers = authToken ? { 'Authorization': `Bearer ${authToken}` } : undefined
-        const resp = await fetch('http://127.0.0.1:8000/v1/runtime/state', { headers })
+        const resp = await fetch(runtimeStateUrl, { headers })
         if (resp.ok) {
           const data = await resp.json()
           const m = String(data?.model || '').toLowerCase()
@@ -721,7 +729,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       try {
         const headers: Record<string, string> = { 'Content-Type': 'application/json' }
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`
-        await fetch('http://127.0.0.1:8000/v1/runtime/state', { method: 'POST', headers, body: JSON.stringify({ model: selectedModel }) })
+        await fetch(runtimeStateUrl, { method: 'POST', headers, body: JSON.stringify({ model: selectedModel }) })
       } catch {}
     })()
   }, [selectedModel, authToken])
@@ -819,7 +827,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
     }
     setIsLoadingConversations(true)
     try {
-      const resp = await fetch('http://127.0.0.1:8000/v1/conversations', {
+      const resp = await fetch(conversationsUrl, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       })
       const data = await resp.json()
@@ -863,7 +871,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       return
     }
     try {
-      const resp = await fetch(`http://127.0.0.1:8000/v1/conversations/${id}`, {
+      const resp = await fetch(`${conversationsUrl}/${id}`, {
         headers: { 'Authorization': `Bearer ${authToken}` }
       })
       if (!resp.ok) {
@@ -988,7 +996,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       return
     }
     try {
-      const resp = await fetch(`http://127.0.0.1:8000/v1/conversations/${id}/title`, {
+      const resp = await fetch(`${conversationsUrl}/${id}/title`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${authToken}` },
         body: JSON.stringify({ title })
@@ -1025,7 +1033,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       return
     }
     try {
-      const resp = await fetch(`http://127.0.0.1:8000/v1/conversations/${id}`, {
+      const resp = await fetch(`${conversationsUrl}/${id}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` }
       })

@@ -5,10 +5,12 @@ import { usePathname } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { BrainCircuit, Home, MessageSquare, Search, Activity, LogIn } from 'lucide-react'
 import dynamic from 'next/dynamic'
+import { buildPublicBackendUrl } from '@/lib/public-backend'
 const ComputeToggle = dynamic(() => import('./compute-toggle'), { ssr: false })
 
 export default function SiteHeader() {
   const pathname = usePathname()
+  const profileUrl = buildPublicBackendUrl('/v1/user')
   const [mounted, setMounted] = useState(false)
   const [authed, setAuthed] = useState(false)
   const [userLabel, setUserLabel] = useState<string>("Tài khoản")
@@ -30,7 +32,7 @@ export default function SiteHeader() {
       }
       if (t && !base) {
         try {
-          fetch('http://127.0.0.1:8000/v1/user', { headers: { 'Authorization': `Bearer ${t}` } })
+          fetch(profileUrl, { headers: { 'Authorization': `Bearer ${t}` } })
             .then(r => r.ok ? r.json() : null)
             .then(d => {
               const nm = String(d?.full_name || d?.username || "").trim()

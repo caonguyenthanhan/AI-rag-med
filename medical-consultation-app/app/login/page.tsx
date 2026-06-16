@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 export default function LoginPage() {
   const router = useRouter()
+  const loginUrl = buildPublicBackendUrl("/v1/login")
+  const googleLoginUrl = buildPublicBackendUrl("/v1/login/google")
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -35,7 +38,7 @@ export default function LoginPage() {
             const credential = response?.credential
             if (!credential) return
             try {
-              const resp = await fetch('http://127.0.0.1:8000/v1/login/google', {
+              const resp = await fetch(googleLoginUrl, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id_token: credential })
@@ -72,7 +75,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      const resp = await fetch('http://127.0.0.1:8000/v1/login', {
+      const resp = await fetch(loginUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, password })

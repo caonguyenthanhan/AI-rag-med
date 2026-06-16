@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 
 const registryPath = path.join(process.cwd(), 'data', 'server-registry.json')
-const defaultGpuUrl = process.env.DEFAULT_GPU_URL || 'https://elissa-villous-scourgingly.ngrok-free.dev'
+const defaultGpuUrl = process.env.DEFAULT_GPU_URL || ''
 
 export async function GET() {
   try {

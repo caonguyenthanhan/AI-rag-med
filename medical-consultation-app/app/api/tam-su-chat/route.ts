@@ -142,4 +142,4 @@ export async function POST(request: NextRequest) {
   }
 }
 
-const defaultGpuUrl = process.env.DEFAULT_GPU_URL || 'https://elissa-villous-scourgingly.ngrok-free.dev'
+const defaultGpuUrl = process.env.DEFAULT_GPU_URL || ''

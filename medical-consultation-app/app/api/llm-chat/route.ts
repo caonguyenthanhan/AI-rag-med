@@ -230,4 +230,4 @@ NGUYÊN TẮC QUAN TRỌNG:
     )
   }
 }
-const defaultGpuUrl = process.env.DEFAULT_GPU_URL || 'https://elissa-villous-scourgingly.ngrok-free.dev'
+const defaultGpuUrl = process.env.DEFAULT_GPU_URL || ''

@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
+import { buildPublicBackendUrl } from "@/lib/public-backend"
 
 type Profile = {
   full_name: string
@@ -32,6 +33,9 @@ function initialFromName(name: string) {
 
 export default function AccountPage() {
   const router = useRouter()
+  const userUrl = buildPublicBackendUrl("/v1/user")
+  const passwordUrl = buildPublicBackendUrl("/v1/user/password")
+  const logoutAllUrl = buildPublicBackendUrl("/v1/user/sessions/logout-all")
   const [profile, setProfile] = useState<Profile>({ full_name: "" })
   const [editingProfile, setEditingProfile] = useState(false)
   const [editingSecurity, setEditingSecurity] = useState(false)
@@ -51,7 +55,7 @@ export default function AccountPage() {
       try {
         let data: any = null
         if (token) {
-          const resp = await fetch("http://127.0.0.1:8000/v1/user", { headers: { Authorization: `Bearer ${token}` } })
+          const resp = await fetch(userUrl, { headers: { Authorization: `Bearer ${token}` } })
           if (resp.ok) data = await resp.json()
         }
         if (!data && typeof window !== "undefined") {
@@ -152,14 +156,14 @@ export default function AccountPage() {
         if (profile.nickname) fd.append("nickname", profile.nickname)
         if (profile.bio) fd.append("bio", profile.bio)
         fd.append("avatar", avatarFile)
-        resp = await fetch("http://127.0.0.1:8000/v1/user", {
+        resp = await fetch(userUrl, {
           method: "PUT",
           headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
           body: fd,
         })
       } else {
         const body: any = { full_name: profile.full_name, nickname: profile.nickname, bio: profile.bio }
-        resp = await fetch("http://127.0.0.1:8000/v1/user", {
+        resp = await fetch(userUrl, {
           method: "PUT",
           headers: token ? { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } : { "Content-Type": "application/json" },
           body: JSON.stringify(body),
@@ -190,7 +194,7 @@ export default function AccountPage() {
     setError(null)
     setSuccess(null)
     try {
-      const resp = await fetch("http://127.0.0.1:8000/v1/user/password", {
+      const resp = await fetch(passwordUrl, {
         method: "PUT",
         headers: token ? { "Content-Type": "application/json", "Authorization": `Bearer ${token}` } : { "Content-Type": "application/json" },
         body: JSON.stringify({ password }),
@@ -221,7 +225,7 @@ export default function AccountPage() {
     setError(null)
     setSuccess(null)
     try {
-      const resp = await fetch("http://127.0.0.1:8000/v1/user/sessions/logout-all", {
+      const resp = await fetch(logoutAllUrl, {
         method: "POST",
         headers: token ? { "Authorization": `Bearer ${token}` } : undefined,
       })

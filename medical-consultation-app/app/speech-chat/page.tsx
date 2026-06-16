@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Mic, Volume2, Pause, Play, Square, ArrowLeft, MessageCircle, Camera, Upload, X, Image as ImageIcon } from 'lucide-react'
 import Link from 'next/link'
+import { buildPublicBackendUrl } from '@/lib/public-backend'
 
 interface Message {
   id: string
@@ -13,6 +14,7 @@ interface Message {
 }
 
 export default function SpeechChatPage() {
+  const visionChatUrl = buildPublicBackendUrl('/v1/vision-chat')
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [isRecording, setIsRecording] = useState(false)
@@ -545,7 +547,7 @@ export default function SpeechChatPage() {
 
   const sendImageWithText = async (text: string, imageBase64: string) => {
     try {
-      const response = await fetch('http://localhost:8000/v1/vision-chat', {
+      const response = await fetch(visionChatUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

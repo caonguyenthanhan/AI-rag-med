@@ -117,7 +117,7 @@ def _get_proxy_base():
                 return cand[0].get("url", LLAMA_SERVER_URL)
     except Exception:
         pass
-    default_gpu = os.environ.get("DEFAULT_GPU_URL", "https://miyoko-trichomonadal-reconditely.ngrok-free.dev")
+    default_gpu = os.environ.get("DEFAULT_GPU_URL", "").strip()
     return default_gpu or LLAMA_SERVER_URL
 
 _LB_INDEX = 0
