@@ -1,0 +1,23 @@
+models/
+RAG/
+DB_ALL/
+data/
+venv/
+.venv/
+ocr-server/
+colab server/
+.git/
+.trae/
+.next/
+node_modules/
+*.gguf
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.sqlite
+*.db
+*.zip
+*.7z
+!medical-consultation-app/data/
