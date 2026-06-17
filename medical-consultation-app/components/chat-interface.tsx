@@ -20,6 +20,39 @@ interface Message {
   content: string
   isUser: boolean
   timestamp: Date
+  ragPassages?: string[]
+}
+
+type StoredMessage = {
+  id: string
+  content: string
+  isUser: boolean
+  timestamp: string
+  ragPassages?: string[]
+}
+
+function serializeMessages(items: Message[]): StoredMessage[] {
+  return items.map((message) => ({
+    id: String(message.id),
+    content: String(message.content),
+    isUser: !!message.isUser,
+    timestamp: message.timestamp.toISOString(),
+    ragPassages: Array.isArray(message.ragPassages) ? message.ragPassages : undefined,
+  }))
+}
+
+function parseStoredMessages(items: any[]): Message[] {
+  return Array.isArray(items)
+    ? items.map((message: any) => ({
+        id: String(message.id),
+        content: String(message.content),
+        isUser: !!message.isUser,
+        timestamp: new Date(message.timestamp),
+        ragPassages: Array.isArray(message.ragPassages)
+          ? message.ragPassages.filter((passage: unknown): passage is string => typeof passage === "string" && passage.trim().length > 0)
+          : undefined,
+      }))
+    : []
 }
 
 export function ChatInterface({ initialConversationId }: { initialConversationId?: string }) {
@@ -169,7 +202,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
         const newId = `conv-${Math.random().toString(16).slice(2)}${Date.now().toString(16)}`
         setConversationId(newId)
         if (typeof window !== 'undefined') {
-          const serial = messages.map(m => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: m.timestamp.toISOString() }))
+          const serial = serializeMessages(messages)
           localStorage.setItem(`conv_messages_${newId}`, JSON.stringify(serial))
           localStorage.setItem(`conv_title_${newId}`, 'Hội thoại')
         }
@@ -221,7 +254,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       try {
         const idToUse = ensuredId || conversationId
         if (idToUse && typeof window !== 'undefined') {
-          const toStore = [...messages, userMessage].map(m => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: m.timestamp.toISOString() }))
+          const toStore = serializeMessages([...messages, userMessage])
           sessionStorage.setItem(`pending_conv_messages_${idToUse}`, JSON.stringify(toStore))
         }
       } catch {}
@@ -248,12 +281,21 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
 
       const data = await response.json()
       const aiResponse = authToken ? ((data as any)?.choices?.[0]?.message?.content || "Không nhận được phản hồi từ máy trả lời") : ((data as any)?.response || "Không nhận được phản hồi từ máy trả lời")
+      const ragPassages = (
+        authToken
+          ? (data as any)?.rag?.passages
+          : (data as any)?.metadata?.rag?.passages
+      )
+      const normalizedRagPassages = Array.isArray(ragPassages)
+        ? ragPassages.filter((passage: unknown): passage is string => typeof passage === "string" && passage.trim().length > 0)
+        : []
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
         content: aiResponse,
         isUser: false,
         timestamp: new Date(),
+        ragPassages: normalizedRagPassages,
       }
       if (authToken && typeof window !== 'undefined') {
         try {
@@ -280,11 +322,11 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       let newId = typeof (data as any).conversation_id === 'string' && (data as any).conversation_id ? (data as any).conversation_id : (ensuredId || conversationId)
       if (newId && typeof window !== 'undefined') {
         try {
-          const toStore = snapshot.map(m => ({ id: m.id, content: m.content, isUser: m.isUser, timestamp: m.timestamp.toISOString() }))
+          const toStore = serializeMessages(snapshot)
           sessionStorage.setItem(`pending_conv_messages_${newId}`, JSON.stringify(toStore))
         } catch {}
         if (!authToken) {
-          const toStore = snapshot.map(m => ({ id: m.id, content: m.content, isUser: m.isUser, timestamp: m.timestamp.toISOString() }))
+          const toStore = serializeMessages(snapshot)
           localStorage.setItem(`conv_messages_${newId}`, JSON.stringify(toStore))
         }
         setConversationId(newId)
@@ -861,7 +903,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
           const raw = localStorage.getItem(`conv_messages_${id}`)
           if (raw) {
             const arr = JSON.parse(raw)
-            const mapped: Message[] = Array.isArray(arr) ? arr.map((m: any) => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: new Date(m.timestamp) })) : []
+            const mapped = parseStoredMessages(arr)
             if (mapped.length) {
               setMessages(mapped)
             }
@@ -897,7 +939,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
           const raw = sessionStorage.getItem(`pending_conv_messages_${id}`)
           if (raw) {
             const arr = JSON.parse(raw)
-            const snap: Message[] = Array.isArray(arr) ? arr.map((m: any) => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: new Date(m.timestamp) })) : []
+            const snap = parseStoredMessages(arr)
             if (snap.length) {
               setMessages(snap)
               sessionStorage.removeItem(`pending_conv_messages_${id}`)
@@ -941,7 +983,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
             const rawPend = sessionStorage.getItem(`pending_conv_messages_${id}`)
             if (rawPend) {
               const arr = JSON.parse(rawPend)
-              const pend: Message[] = Array.isArray(arr) ? arr.map((m: any) => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: new Date(m.timestamp) })) : []
+              const pend = parseStoredMessages(arr)
               if (pend.length) {
                 const existing = new Set(mapped.map(m => m.id))
                 const merged = [...mapped]
@@ -1078,7 +1120,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
           const raw = localStorage.getItem(`conv_messages_${initialConversationId}`)
           if (raw) {
             const arr = JSON.parse(raw)
-            const mapped: Message[] = Array.isArray(arr) ? arr.map((m: any) => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: new Date(m.timestamp) })) : []
+            const mapped = parseStoredMessages(arr)
             if (mapped.length) {
               setMessages(mapped)
               setConversationId(initialConversationId)
@@ -1109,7 +1151,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
     if (!authToken && conversationId) {
       try {
         if (typeof window !== 'undefined') {
-          const serial = messages.map(m => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: m.timestamp.toISOString() }))
+          const serial = serializeMessages(messages)
           localStorage.setItem(`conv_messages_${conversationId}`, JSON.stringify(serial))
           const titleKey = `conv_title_${conversationId}`
           const existingTitle = localStorage.getItem(titleKey) || ''
@@ -1130,7 +1172,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
     const handler = () => {
       try {
         if (conversationId && typeof window !== 'undefined') {
-          const toStore = messages.map(m => ({ id: String(m.id), content: String(m.content), isUser: !!m.isUser, timestamp: m.timestamp.toISOString() }))
+          const toStore = serializeMessages(messages)
           sessionStorage.setItem(`pending_conv_messages_${conversationId}`, JSON.stringify(toStore))
         }
       } catch {}
@@ -1307,9 +1349,26 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
               {message.isUser ? (
                 <p className="text-sm whitespace-pre-wrap leading-relaxed">{message.content}</p>
               ) : (
-                <div className="text-sm prose prose-sm dark:prose-invert leading-relaxed" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
-                </div>
+                <>
+                  {Array.isArray(message.ragPassages) && message.ragPassages.length > 0 && (
+                    <details className="mb-3 rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 text-xs text-blue-950">
+                      <summary className="cursor-pointer select-none font-medium">
+                        Context RAG ({message.ragPassages.length} đoạn)
+                      </summary>
+                      <div className="mt-2 space-y-2">
+                        {message.ragPassages.map((passage, passageIndex) => (
+                          <div key={`${message.id}-rag-${passageIndex}`} className="rounded bg-white/80 px-2 py-2 leading-relaxed text-gray-800">
+                            <p className="mb-1 font-medium text-blue-700">Đoạn {passageIndex + 1}</p>
+                            <p className="whitespace-pre-wrap">{passage}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+                  <div className="text-sm prose prose-sm dark:prose-invert leading-relaxed" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
+                  </div>
+                </>
               )}
               {!message.isUser && (
                 <div className="flex justify-end mt-2 space-x-1">

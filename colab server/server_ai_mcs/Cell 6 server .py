@@ -492,15 +492,20 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
                         ctx += "\n[Đoạn " + str(i + 1) + "]:\n" + p + "\n"
                     
                     # Update prompt with RAG context
-                    rag_info = {"used": True, "retrieved": len(context_passages), "selected": top_k}
+                    rag_info = {
+                        "used": True,
+                        "retrieved": len(context_passages),
+                        "selected": top_k,
+                        "passages": selected
+                    }
                 else:
                     # Fallback to basic if retriever is missing
                     ctx = question
-                    rag_info = {"used": False, "reason": "retriever_missing"}
+                    rag_info = {"used": False, "reason": "retriever_missing", "passages": []}
             except Exception as e:
                 print(f"RAG Error: {e}")
                 ctx = question
-                rag_info = {"used": False, "error": str(e)}
+                rag_info = {"used": False, "error": str(e), "passages": []}
 
             doctor_prompt = "Bạn là bác sỹ tư vấn y tế, không kê đơn thuốc, không chẩn đoán thay thế chuyên môn. Trả lời tiếng Việt, ngắn gọn, rõ ràng, ưu tiên an toàn và khuyến cáo gặp bác sỹ khi cần."
             
@@ -548,7 +553,7 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
             response_text = chat_tokenizer.decode(output[0][inputs.input_ids.shape[-1]:], skip_special_tokens=True)
             del inputs, output
             torch.cuda.empty_cache()
-            rag_info = {"used": False, "retrieved": 0, "selected": 0}
+            rag_info = {"used": False, "retrieved": 0, "selected": 0, "passages": []}
         return {
             "id": f"chatcmpl-{uuid.uuid4()}",
             "object": "chat.completion",
