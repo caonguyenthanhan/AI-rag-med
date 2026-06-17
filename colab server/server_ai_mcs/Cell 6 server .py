@@ -62,6 +62,28 @@ async def root():
 async def health():
     return {"status": "ok"}
 
+@app.get("/gpu/metrics")
+async def gpu_metrics():
+    data = {"service": "gpu", "cuda_available": bool(torch.cuda.is_available())}
+    if not torch.cuda.is_available():
+        return data
+    try:
+        device_index = torch.cuda.current_device()
+        props = torch.cuda.get_device_properties(device_index)
+        allocated = torch.cuda.memory_allocated(device_index)
+        reserved = torch.cuda.memory_reserved(device_index)
+        total = props.total_memory
+        data.update({
+            "gpu_name": torch.cuda.get_device_name(device_index),
+            "mem_total_mb": round(total / (1024 * 1024), 2),
+            "mem_allocated_mb": round(allocated / (1024 * 1024), 2),
+            "mem_reserved_mb": round(reserved / (1024 * 1024), 2),
+            "mem_free_estimated_mb": round((total - reserved) / (1024 * 1024), 2),
+        })
+    except Exception as e:
+        data["error"] = str(e)
+    return data
+
 ocr_engine = None
 ocr_last_error = None
 ocr_backend = None
@@ -469,7 +491,18 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
                 "object": "chat.completion",
                 "created": int(time.time()),
                 "choices": [{"index": 0, "message": {"role": "assistant", "content": response_text}, "finish_reason": "stop"}],
-                "mode": mode
+                "mode": mode,
+                "prompt_trace": {
+                    "mode": mode,
+                    "question": question,
+                    "classification_prompt": classify_prompt,
+                    "classification_result": cls_resp,
+                    "system_prompt": "",
+                    "user_prompt": question,
+                    "final_prompt": cls_text_tmpl,
+                    "rag_used": False,
+                    "rag_passages": []
+                }
             }
         if mode == "pro":
             try:
@@ -485,17 +518,19 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
                     except Exception:
                         ranked = context_passages
                     top_k = min(3, len(ranked))
-                    selected = ranked[:top_k]
-                    ctx = "Đây là câu hỏi của người dùng:\n" + question + "\n\n"
-                    ctx += "Dưới đây là các đoạn thông tin liên quan:\n"
-                    for i, p in enumerate(selected):
-                        ctx += "\n[Đoạn " + str(i + 1) + "]:\n" + p + "\n"
-                    
+                    selected = [p.strip() for p in ranked[:top_k] if isinstance(p, str) and p.strip()]
+                    ctx = question
+                    if selected:
+                        ctx = "CÂU HỎI NGƯỜI DÙNG:\n" + question + "\n\n"
+                        ctx += "NGỮ CẢNH THAM KHẢO TỪ RAG:\n"
+                        for i, p in enumerate(selected):
+                            ctx += "\n[ĐOẠN " + str(i + 1) + "]\n" + p + "\n"
+
                     # Update prompt with RAG context
                     rag_info = {
-                        "used": True,
+                        "used": len(selected) > 0,
                         "retrieved": len(context_passages),
-                        "selected": top_k,
+                        "selected": len(selected),
                         "passages": selected
                     }
                 else:
@@ -507,7 +542,13 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
                 ctx = question
                 rag_info = {"used": False, "error": str(e), "passages": []}
 
-            doctor_prompt = "Bạn là bác sỹ tư vấn y tế, không kê đơn thuốc, không chẩn đoán thay thế chuyên môn. Trả lời tiếng Việt, ngắn gọn, rõ ràng, ưu tiên an toàn và khuyến cáo gặp bác sỹ khi cần."
+            doctor_prompt = (
+                "Bạn là bác sỹ tư vấn y tế, không kê đơn thuốc, không chẩn đoán thay thế chuyên môn. "
+                "Trả lời tiếng Việt, ngắn gọn, rõ ràng, ưu tiên an toàn và khuyến cáo gặp bác sỹ khi cần.\n"
+                "Nếu có NGỮ CẢNH THAM KHẢO TỪ RAG thì phải dùng các đoạn đó làm căn cứ chính để trả lời.\n"
+                "Không được nói rằng bạn không xem được ngữ cảnh, không thấy đoạn thông tin, hoặc không có context window.\n"
+                "Nếu ngữ cảnh chưa đủ để kết luận, hãy nói rõ thông tin còn thiếu và hỏi lại ngắn gọn."
+            )
             
             # Use ctx (either with RAG or just question)
             if rag_info.get("used"):
@@ -533,6 +574,17 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
             print(f"📤 [Response] Len: {len(response_text)} chars")
             del inputs, output
             torch.cuda.empty_cache()
+            prompt_trace = {
+                "mode": mode,
+                "question": question,
+                "classification_prompt": classify_prompt,
+                "classification_result": cls_resp,
+                "system_prompt": doctor_prompt,
+                "user_prompt": user_content,
+                "final_prompt": input_text,
+                "rag_used": bool(rag_info.get("used")),
+                "rag_passages": rag_info.get("passages") or []
+            }
             # rag_info updated safely above
         else:
             doctor_prompt = "Bạn là bác sỹ tư vấn y tế, không kê đơn thuốc, không chẩn đoán thay thế chuyên môn. Trả lời tiếng Việt, ngắn gọn, rõ ràng, ưu tiên an toàn và khuyến cáo gặp bác sỹ khi cần."
@@ -554,13 +606,25 @@ async def chat_completions(req: ChatRequest, x_mode: Optional[str] = Header(None
             del inputs, output
             torch.cuda.empty_cache()
             rag_info = {"used": False, "retrieved": 0, "selected": 0, "passages": []}
+            prompt_trace = {
+                "mode": mode,
+                "question": question,
+                "classification_prompt": classify_prompt,
+                "classification_result": cls_resp,
+                "system_prompt": doctor_prompt,
+                "user_prompt": question,
+                "final_prompt": input_text,
+                "rag_used": False,
+                "rag_passages": []
+            }
         return {
             "id": f"chatcmpl-{uuid.uuid4()}",
             "object": "chat.completion",
             "created": int(time.time()),
             "choices": [{"index": 0, "message": {"role": "assistant", "content": response_text}, "finish_reason": "stop"}],
             "mode": mode,
-            "rag": rag_info
+            "rag": rag_info,
+            "prompt_trace": prompt_trace
         }
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
@@ -758,7 +822,7 @@ try:
     # Kết nối mới
     public_url = ngrok.connect(PORT).public_url
     print(f"🚀 Public URL: {public_url}")
-    print(f"👉 Hãy copy URL này vào file runtime-mode.json (trường 'ngrok_url')")
+    print(f"👉 Hãy copy URL này vào file runtime-mode.json (trường 'gpu_url')")
 except Exception as e:
     print(f"⚠️ Không thể khởi tạo ngrok: {e}")
 

@@ -21,6 +21,17 @@ interface Message {
   isUser: boolean
   timestamp: Date
   ragPassages?: string[]
+  promptTrace?: {
+    mode?: string
+    question?: string
+    classification_prompt?: string
+    classification_result?: string
+    system_prompt?: string
+    user_prompt?: string
+    final_prompt?: string
+    rag_used?: boolean
+    rag_passages?: string[]
+  }
 }
 
 type StoredMessage = {
@@ -29,6 +40,7 @@ type StoredMessage = {
   isUser: boolean
   timestamp: string
   ragPassages?: string[]
+  promptTrace?: Message["promptTrace"]
 }
 
 function serializeMessages(items: Message[]): StoredMessage[] {
@@ -38,6 +50,7 @@ function serializeMessages(items: Message[]): StoredMessage[] {
     isUser: !!message.isUser,
     timestamp: message.timestamp.toISOString(),
     ragPassages: Array.isArray(message.ragPassages) ? message.ragPassages : undefined,
+    promptTrace: message.promptTrace,
   }))
 }
 
@@ -51,6 +64,7 @@ function parseStoredMessages(items: any[]): Message[] {
         ragPassages: Array.isArray(message.ragPassages)
           ? message.ragPassages.filter((passage: unknown): passage is string => typeof passage === "string" && passage.trim().length > 0)
           : undefined,
+        promptTrace: message.promptTrace && typeof message.promptTrace === "object" ? message.promptTrace : undefined,
       }))
     : []
 }
@@ -289,6 +303,11 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
       const normalizedRagPassages = Array.isArray(ragPassages)
         ? ragPassages.filter((passage: unknown): passage is string => typeof passage === "string" && passage.trim().length > 0)
         : []
+      const promptTrace = (
+        authToken
+          ? (data as any)?.prompt_trace
+          : (data as any)?.metadata?.prompt_trace
+      )
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
@@ -296,6 +315,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
         isUser: false,
         timestamp: new Date(),
         ragPassages: normalizedRagPassages,
+        promptTrace: promptTrace && typeof promptTrace === "object" ? promptTrace : undefined,
       }
       if (authToken && typeof window !== 'undefined') {
         try {
@@ -1362,6 +1382,46 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
                             <p className="whitespace-pre-wrap">{passage}</p>
                           </div>
                         ))}
+                      </div>
+                    </details>
+                  )}
+                  {message.promptTrace && (
+                    <details className="mb-3 rounded-md border border-emerald-200 bg-emerald-50/80 px-3 py-2 text-xs text-emerald-950">
+                      <summary className="cursor-pointer select-none font-medium">
+                        Xem context window / prompt LLM
+                      </summary>
+                      <div className="mt-2 space-y-3">
+                        <div className="rounded bg-white/80 px-2 py-2 text-gray-800">
+                          <p className="mb-1 font-medium text-emerald-700">Tổng quan</p>
+                          <p>Mode: {message.promptTrace.mode || "unknown"}</p>
+                          <p>RAG: {message.promptTrace.rag_used ? "Có" : "Không"}</p>
+                          <p>Số đoạn context: {Array.isArray(message.promptTrace.rag_passages) ? message.promptTrace.rag_passages.length : 0}</p>
+                        </div>
+                        {message.promptTrace.classification_prompt && (
+                          <div className="rounded bg-white/80 px-2 py-2 text-gray-800">
+                            <p className="mb-1 font-medium text-emerald-700">Prompt phân loại y tế</p>
+                            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{message.promptTrace.classification_prompt}</pre>
+                            <p className="mt-2 text-[11px]">Kết quả: {message.promptTrace.classification_result || "n/a"}</p>
+                          </div>
+                        )}
+                        {message.promptTrace.system_prompt && (
+                          <div className="rounded bg-white/80 px-2 py-2 text-gray-800">
+                            <p className="mb-1 font-medium text-emerald-700">System Prompt</p>
+                            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{message.promptTrace.system_prompt}</pre>
+                          </div>
+                        )}
+                        {message.promptTrace.user_prompt && (
+                          <div className="rounded bg-white/80 px-2 py-2 text-gray-800">
+                            <p className="mb-1 font-medium text-emerald-700">User Prompt đưa vào LLM</p>
+                            <pre className="whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{message.promptTrace.user_prompt}</pre>
+                          </div>
+                        )}
+                        {message.promptTrace.final_prompt && (
+                          <div className="rounded bg-white/80 px-2 py-2 text-gray-800">
+                            <p className="mb-1 font-medium text-emerald-700">Final Prompt / Chat Template</p>
+                            <pre className="max-h-80 overflow-auto whitespace-pre-wrap font-mono text-[11px] leading-relaxed">{message.promptTrace.final_prompt}</pre>
+                          </div>
+                        )}
                       </div>
                     </details>
                   )}

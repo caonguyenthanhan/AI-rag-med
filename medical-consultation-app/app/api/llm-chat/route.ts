@@ -224,7 +224,16 @@ NGUYÊN TẮC QUAN TRỌNG:
         tier: modeHeader,
         fallback: originalTarget === 'gpu' && modeUsed === 'cpu',
         model_init: !!(data && (data as any).model_init),
-        rag: (data && (data as any).rag) ? (data as any).rag : undefined
+        rag: (data && (data as any).rag) ? (data as any).rag : undefined,
+        prompt_trace: (data && (data as any).prompt_trace) ? (data as any).prompt_trace : {
+          mode: modeHeader,
+          question: userMessage,
+          system_prompt: systemPrompt,
+          user_prompt: userMessage,
+          final_prompt: JSON.stringify(body.messages, null, 2),
+          rag_used: false,
+          rag_passages: []
+        }
       },
       conversation_id: newConversationId
     })
