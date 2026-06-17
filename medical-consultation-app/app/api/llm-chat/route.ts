@@ -39,10 +39,12 @@ export async function POST(request: NextRequest) {
     const determinedContext = context || determineContext(userMessage, conversationHistory)
     
     const cpuFallback = process.env.INTERNAL_LLM_URL || 'http://127.0.0.1:8000/v1/chat/completions'
-    let fastApiUrl = `${String(defaultGpuUrl).replace(/\/$/, '')}/v1/chat/completions`
+    const defaultGpuChatUrl = defaultGpuUrl ? `${String(defaultGpuUrl).replace(/\/$/, '')}/v1/chat/completions` : ''
+    let fastApiUrl = cpuFallback
     let originalTarget: 'cpu' | 'gpu' = 'gpu'
     try {
       const dataDir = path.join(process.cwd(), 'data')
+      let preferredGpuUrl = defaultGpuChatUrl
       // Prefer runtime-mode gpu_url if set
       try {
         const modeRaw = fs.readFileSync(path.join(dataDir, 'runtime-mode.json'), 'utf-8')
@@ -51,20 +53,25 @@ export async function POST(request: NextRequest) {
           originalTarget = mode.target
         }
         if (mode?.gpu_url) {
-          fastApiUrl = `${String(mode.gpu_url).replace(/\/$/, '')}/v1/chat/completions`
+          preferredGpuUrl = `${String(mode.gpu_url).replace(/\/$/, '')}/v1/chat/completions`
         }
       } catch {}
-      // Otherwise pick latest from server registry
-      try {
-        const regRaw = fs.readFileSync(path.join(dataDir, 'server-registry.json'), 'utf-8')
-        const reg = JSON.parse(regRaw)
-        const servers = Array.isArray(reg?.servers) ? reg.servers : []
-        const active = servers.filter((s: any) => s.status === 'active')
-        const latest = (active.length ? active : servers).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
-        if (latest?.url) {
-          fastApiUrl = `${String(latest.url).replace(/\/$/, '')}/v1/chat/completions`
+      if (originalTarget === 'gpu') {
+        // Otherwise pick latest from server registry
+        try {
+          const regRaw = fs.readFileSync(path.join(dataDir, 'server-registry.json'), 'utf-8')
+          const reg = JSON.parse(regRaw)
+          const servers = Array.isArray(reg?.servers) ? reg.servers : []
+          const active = servers.filter((s: any) => s.status === 'active')
+          const latest = (active.length ? active : servers).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
+          if (latest?.url) {
+            preferredGpuUrl = `${String(latest.url).replace(/\/$/, '')}/v1/chat/completions`
+          }
+        } catch {}
+        if (preferredGpuUrl) {
+          fastApiUrl = preferredGpuUrl
         }
-      } catch {}
+      }
     } catch {}
     const personaText = typeof systemPromptOverride === 'string' && systemPromptOverride.trim()
       ? systemPromptOverride.trim()

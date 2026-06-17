@@ -1353,7 +1353,7 @@ export function ChatInterface({ initialConversationId }: { initialConversationId
                   {Array.isArray(message.ragPassages) && message.ragPassages.length > 0 && (
                     <details className="mb-3 rounded-md border border-blue-200 bg-blue-50/80 px-3 py-2 text-xs text-blue-950">
                       <summary className="cursor-pointer select-none font-medium">
-                        Context RAG ({message.ragPassages.length} đoạn)
+                        Xem context RAG ({message.ragPassages.length} đoạn)
                       </summary>
                       <div className="mt-2 space-y-2">
                         {message.ragPassages.map((passage, passageIndex) => (

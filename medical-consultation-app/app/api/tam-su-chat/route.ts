@@ -20,9 +20,11 @@ export async function POST(request: NextRequest) {
 
     const dataDir = path.join(process.cwd(), 'data')
     const cpuFallback = process.env.INTERNAL_FRIEND_CHAT_URL || 'http://127.0.0.1:8000/v1/friend-chat/completions'
-    let targetUrl = `${String(defaultGpuUrl).replace(/\/$/, '')}/v1/friend-chat/completions`
+    const defaultGpuFriendUrl = defaultGpuUrl ? `${String(defaultGpuUrl).replace(/\/$/, '')}/v1/friend-chat/completions` : ''
+    let targetUrl = cpuFallback
     let originalTarget: 'cpu' | 'gpu' = 'gpu'
     try {
+      let preferredGpuUrl = defaultGpuFriendUrl
       try {
         const modeRaw = fs.readFileSync(path.join(dataDir, 'runtime-mode.json'), 'utf-8')
         const mode = JSON.parse(modeRaw)
@@ -30,19 +32,24 @@ export async function POST(request: NextRequest) {
           originalTarget = mode.target
         }
         if (mode?.gpu_url) {
-          targetUrl = `${String(mode.gpu_url).replace(/\/$/, '')}/v1/friend-chat/completions`
+          preferredGpuUrl = `${String(mode.gpu_url).replace(/\/$/, '')}/v1/friend-chat/completions`
         }
       } catch {}
-      try {
-        const regRaw = fs.readFileSync(path.join(dataDir, 'server-registry.json'), 'utf-8')
-        const reg = JSON.parse(regRaw)
-        const servers = Array.isArray(reg?.servers) ? reg.servers : []
-        const active = servers.filter((s: any) => s.status === 'active')
-        const latest = (active.length ? active : servers).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
-        if (latest?.url) {
-          targetUrl = `${String(latest.url).replace(/\/$/, '')}/v1/friend-chat/completions`
+      if (originalTarget === 'gpu') {
+        try {
+          const regRaw = fs.readFileSync(path.join(dataDir, 'server-registry.json'), 'utf-8')
+          const reg = JSON.parse(regRaw)
+          const servers = Array.isArray(reg?.servers) ? reg.servers : []
+          const active = servers.filter((s: any) => s.status === 'active')
+          const latest = (active.length ? active : servers).sort((a: any, b: any) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())[0]
+          if (latest?.url) {
+            preferredGpuUrl = `${String(latest.url).replace(/\/$/, '')}/v1/friend-chat/completions`
+          }
+        } catch {}
+        if (preferredGpuUrl) {
+          targetUrl = preferredGpuUrl
         }
-      } catch {}
+      }
     } catch {}
 
     const friendSystem = "Bạn là một người bạn thân, nói chuyện đời thường bằng tiếng Việt. Cách nói tự nhiên, gần gũi, có thể hài hước nhẹ, dùng từ ngữ bình dân. Nguyên tắc: ưu tiên lắng nghe và đồng cảm; không giảng đạo lý; không khuyên dạy ngay trừ khi người dùng hỏi rõ; phản hồi giống người thật; có thể hỏi lại 1 câu ngắn để hiểu thêm cảm xúc người nói."
